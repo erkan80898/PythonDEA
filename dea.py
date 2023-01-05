@@ -17,7 +17,7 @@ final_perm = [40, 8, 48, 16, 56, 24, 64, 32,
               34, 2, 42, 10, 50, 18, 58, 26,
               33, 1, 41, 9, 49, 17, 57, 25]
 
-exp_d = [32, 1, 2, 3, 4, 5, 4, 5,
+exp_perm = [32, 1, 2, 3, 4, 5, 4, 5,
          6, 7, 8, 9, 8, 9, 10, 11,
          12, 13, 12, 13, 14, 15, 16, 17,
          16, 17, 18, 19, 20, 21, 20, 21,
@@ -99,6 +99,40 @@ def prem(block, type=True):
         count += 1
     return result
 
+def partition(block):
+    mask = 0xFFFFFFFF
+    return block >> 32, block & mask
+
+def expansion(block):
+    result = 0
+    count = 1
+    for idx in exp_perm:
+        if get_bit(block, idx):
+            result = set_bit(result, count, True)
+        else:
+            result = set_bit(result, count, False)
+        count += 1
+    return result
+
+def apply_round_key(blocks, key):
+    return map(lambda x: x ^ key, blocks)
+
+def apply_sbox(blocks):
+    result = []
+    mask_MSB = 0b100000
+    mask_LSB = 1
+    mask_inner = 0b011110
+    count = 0
+    for block in blocks:
+        row = ((block & mask_MSB) >> 4 | (block & mask_LSB))
+        col = (block & mask_inner) >> 1
+        result.append(sbox[count][row][col])
+        count += 1
+    return result
 
 post_IP = prem(test)
-print(hex(post_IP))
+(left, right) = partition(post_IP)
+y = expansion(left) >> 42
+z = apply_sbox([y])
+print(bin(y))
+print(bin(z[0]))
