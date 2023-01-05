@@ -134,5 +134,3 @@ post_IP = prem(test)
 (left, right) = partition(post_IP)
 y = expansion(left) >> 42
 z = apply_sbox([y])
-print(bin(y))
-print(bin(z[0]))
