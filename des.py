@@ -40,6 +40,13 @@ PARITY_DROP = [57, 49, 41, 33, 25, 17, 9, 1,
                30, 22, 14, 6, 61, 53, 45, 37,
                29, 21, 13, 5, 28, 20, 12, 4]
 
+KEY_PREM = [14, 17, 11, 24, 1, 5, 3, 28,
+            15, 6, 21, 10, 23, 19, 12, 4,
+            26, 8, 16, 7, 27, 20, 13, 2,
+            41, 52, 31, 37, 47, 55, 30, 40,
+            51, 45, 33, 48, 44, 49, 39, 56,
+            34, 53, 46, 42, 50, 36, 29, 32]
+
 SBOX = [[[14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7],
          [0, 15, 7, 4, 14, 2, 13, 1, 10, 6, 12, 11, 9, 5, 3, 8],
          [4, 1, 14, 8, 13, 6, 2, 11, 15, 12, 9, 7, 3, 10, 5, 0],
@@ -81,7 +88,7 @@ SBOX = [[[14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7],
          [2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11]]]
 
 test = 0xA51FF2A7C67BA384
-
+round = 1
 
 def set_bit(bits, pos, on):
     if on:
@@ -150,15 +157,23 @@ def bit_rotation(block, round_num):
         shift = 1
     else:
         shift = 2
-    return (block << shift | block >> (28 - shift)) % 2**28;
+    return ((block << shift) | (block >> (28 - shift))) % 2**28
 
-def key_scheduler(key):
+
+def enc_key_scheduler(key):
+    global round
     (left, right) = partition(key, 56)
+    left = bit_rotation(left, round)
+    right = bit_rotation(right, round)
 
+    key_block = (left << 28) | right
+    subkey = prem(key_block, KEY_PREM)
+    round += 1
+    return subkey
 
 
 post_IP = prem(test, INITIAL_PERM)
-(left, right) = partition(post_IP, 64)
-y = expansion(left) >> 42
+(a, b) = partition(post_IP, 64)
+y = expansion(a) >> 42
 z = apply_sbox([y])
 
