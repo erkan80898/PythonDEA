@@ -107,9 +107,12 @@ def prem(block, table):
     return result
 
 
-def partition(block):
-    mask = 0xFFFFFFFF
-    return block >> 32, block & mask
+def partition(block, block_size):
+    if block_size == 64:
+        mask = 0xFFFFFFFF
+    else:
+        mask = 0xFFFFFFF
+    return block >> (block_size // 2), block & mask
 
 
 def expansion(block):
@@ -141,7 +144,21 @@ def apply_sbox(blocks):
         count += 1
     return result
 
+
+def bit_rotation(block, round_num):
+    if round_num in [1, 2, 9, 16]:
+        shift = 1
+    else:
+        shift = 2
+    return (block << shift | block >> (28 - shift)) % 2**28;
+
+def key_scheduler(key):
+    (left, right) = partition(key, 56)
+
+
+
 post_IP = prem(test, INITIAL_PERM)
-(left, right) = partition(post_IP)
+(left, right) = partition(post_IP, 64)
 y = expansion(left) >> 42
 z = apply_sbox([y])
+
