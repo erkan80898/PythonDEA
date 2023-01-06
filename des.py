@@ -1,3 +1,5 @@
+import operator
+
 INITIAL_PERM = [58, 50, 42, 34, 26, 18, 10, 2,
                 60, 52, 44, 36, 28, 20, 12, 4,
                 62, 54, 46, 38, 30, 22, 14, 6,
@@ -90,6 +92,12 @@ SBOX = [[[14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7],
 test = 0xA51FF2A7C67BA384
 round = 1
 
+
+def print_b(val, bits):
+    bits = str(bits + 2)
+    print(format(val, '#0' + bits + 'b'))
+
+
 def set_bit(bits, pos, on):
     if on:
         return bits | (1 << pos - 1)
@@ -152,23 +160,40 @@ def apply_sbox(blocks):
     return result
 
 
-def bit_rotation(block, round_num):
-    if round_num in [1, 2, 9, 16]:
-        shift = 1
-    else:
-        shift = 2
-    return ((block << shift) | (block >> (28 - shift))) % 2**28
+def bit_rotation(block, shift_count, op):
+    return ((block << shift_count) | (op(block, (28 - shift_count)))) % 2 ** 28
 
 
-def enc_key_scheduler(key):
+# mode = True -> Enc
+def key_scheduler(key, mode):
     global round
-    (left, right) = partition(key, 56)
-    left = bit_rotation(left, round)
-    right = bit_rotation(right, round)
+    shift = operator.lshift
+    if not mode:
+        shift = operator.rshift
 
+    if mode and round == 1:
+        key = prem(key, PARITY_DROP)
+    elif not mode and round == 16:
+        (left, right) = partition(key, 56)
+        key_block = (left << 28) | right
+        round -= 1
+        return prem(key_block, KEY_PREM)
+
+    (left, right) = partition(key, 56)
+
+    shift_count = 1
+    if round not in [1, 2, 9, 16]:
+        shift_count = 2
+
+    left = bit_rotation(left, shift_count, shift)
+    right = bit_rotation(right, shift_count, shift)
     key_block = (left << 28) | right
     subkey = prem(key_block, KEY_PREM)
-    round += 1
+
+    if mode:
+        round += 1
+    else:
+        round -= 1
     return subkey
 
 
@@ -177,3 +202,7 @@ post_IP = prem(test, INITIAL_PERM)
 y = expansion(a) >> 42
 z = apply_sbox([y])
 
+g = 0b100110111001111110111010010110101111110101101001
+subkeytest = key_scheduler(g, True)
+print_b(g, 64)
+print_b(subkeytest, 48)
