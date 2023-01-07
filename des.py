@@ -99,27 +99,32 @@ def print_keys(keys):
     for key in keys:
         print_b(key, 48)
 
+def print_keys_hex(keys):
+    for key in keys:
+        print(hex(key))
 
-def set_bit(bits, pos, on):
+def set_bit(bits, bit_size, pos, on):
+    pos = bit_size - (pos - 1)
     if on:
-        return bits | (1 << pos - 1)
+        return bits | (1 << (pos - 1))
     else:
-        return bits & ~(1 << pos - 1)
+        return bits & ~(1 << (pos - 1))
 
 
-def get_bit(bits, pos):
-    return (bits >> (pos - 1)) & 1
+def get_bit(bits, bit_size, pos):
+    pos = bit_size - (pos - 1)
+    return (bits >> pos) & 1
 
 
-def prem(block, table):
+def prem(block, block_size, table):
     result = 0
     count = 1
 
     for idx in table:
-        if get_bit(block, idx):
-            result = set_bit(result, count, True)
+        if get_bit(block, block_size,  idx):
+            result = set_bit(result, block_size, count, True)
         else:
-            result = set_bit(result, count, False)
+            result = set_bit(result, block_size, count, False)
         count += 1
     return result
 
@@ -175,42 +180,47 @@ def key_scheduler(key, mode, round, subkeys):
         return
 
     if round == 1:
-        key = prem(key, PARITY_DROP)
+        key = prem(key, 64, PARITY_DROP)
 
     if not mode and round == 1:
-        (left, right) = partition(key, 56)
-        key_block = (left << 28) | right
-        subkey_n = prem(key_block, KEY_PREM)
+        subkey_n = prem(key, 56, KEY_PREM)
         subkeys.append(subkey_n)
-        return key_scheduler(key_block, mode, round + 1, subkeys)
-
-    (left, right) = partition(key, 56)
+        return key_scheduler(key, mode, round + 1, subkeys)
 
     shift_count = 1
     if round not in [1, 2, 9, 16]:
         shift_count = 2
 
+    (left, right) = partition(key, 56)
     left = bit_rotation(left, 28, shift_count, mode)
     right = bit_rotation(right, 28, shift_count, mode)
     key_block = (left << 28) | right
-    subkey_n = prem(key_block, KEY_PREM)
+    subkey_n = prem(key_block, 56, KEY_PREM)
     subkeys.append(subkey_n)
 
     return key_scheduler(key_block, mode, round + 1, subkeys)
 
 
-def driver(key, mode):
-    subkeys = []
-    key_scheduler(key, mode, 1, subkeys)
-    return subkeys
-    # for key in subkeys:
-    # print_b(key, 48)
+# def driver(key, mode):
+#     subkeys = []
+#     key_scheduler(key, mode, 1, subkeys)
+#     return subkeys
+#     # for key in subkeys:
+#     # print_b(key, 48)
 
 
-post_IP = prem(test, INITIAL_PERM)
-(a, b) = partition(post_IP, 64)
-y = expansion(a) >> 42
-z = apply_sbox([y])
 
-g = 0xAABB09182736CCDD
-subkeytest = driver(g, True)
+g = 0x01FE01FE01FE01FEFE01FE01FE01FE01
+def test_perm(key):
+    keys = []
+    key_scheduler(g, True, 1, keys)
+    print_keys_hex(keys)
+
+test_perm(g)
+
+# post_IP = prem(test, INITIAL_PERM)
+# (a, b) = partition(post_IP, 64)
+# y = expansion(a) >> 42
+# z = apply_sbox([y])
+#
+# subkeytest = driver(g, True)
