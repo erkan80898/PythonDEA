@@ -130,10 +130,12 @@ def prem(block, block_size, table):
 
 
 def partition(block, block_size):
-    if block_size == 64:
-        mask = 0xFFFFFFFF
-    elif block_size == 56:
+    if block_size == 56:
         mask = 0xFFFFFFF
+    else:
+        #6 bit mask
+        mask = 0x3F
+
     return block >> (block_size // 2), block & mask
 
 
@@ -149,8 +151,11 @@ def expansion(block):
     return result
 
 
-def apply_round_key(blocks, key):
-    return map(lambda x: x ^ key, blocks)
+def apply_f(block, block_size, key):
+    block = prem(block, block_size, EXP_PERM)
+    block ^= key
+    #partition into eight 6 bits for sbox application
+
 
 
 def apply_sbox(blocks):
@@ -200,27 +205,23 @@ def key_scheduler(key, mode, round, subkeys):
 
     return key_scheduler(key_block, mode, round + 1, subkeys)
 
+def des(block, block_size, )
 
-# def driver(key, mode):
-#     subkeys = []
-#     key_scheduler(key, mode, 1, subkeys)
-#     return subkeys
-#     # for key in subkeys:
-#     # print_b(key, 48)
+def driver(key):
+    key = 0xAABB09182736CCDD
+    plaintext = 0x123456ABCD132536
+    cipher = 0xC0B7A8D05F3A829C
+
+    #ENCRYPTION
+    subkeys = []
+    key_scheduler(key, True, 1, subkeys)
+
+    plaintext = prem(plaintext, 64, INITIAL_PERM)
 
 
 
-g = 0x01FE01FE01FE01FEFE01FE01FE01FE01
-def test_perm(key):
-    keys = []
-    key_scheduler(g, True, 1, keys)
-    print_keys_hex(keys)
 
-test_perm(g)
 
-# post_IP = prem(test, INITIAL_PERM)
-# (a, b) = partition(post_IP, 64)
-# y = expansion(a) >> 42
-# z = apply_sbox([y])
-#
-# subkeytest = driver(g, True)
+
+
+
