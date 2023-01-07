@@ -1,5 +1,3 @@
-import operator
-
 INITIAL_PERM = [58, 50, 42, 34, 26, 18, 10, 2,
                 60, 52, 44, 36, 28, 20, 12, 4,
                 62, 54, 46, 38, 30, 22, 14, 6,
@@ -90,12 +88,16 @@ SBOX = [[[14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7],
          [2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11]]]
 
 test = 0xA51FF2A7C67BA384
-round = 1
 
 
 def print_b(val, bits):
     bits = str(bits + 2)
     print(format(val, '#0' + bits + 'b'))
+
+
+def print_keys(keys):
+    for key in keys:
+        print_b(key, 48)
 
 
 def set_bit(bits, pos, on):
@@ -125,7 +127,7 @@ def prem(block, table):
 def partition(block, block_size):
     if block_size == 64:
         mask = 0xFFFFFFFF
-    else:
+    elif block_size == 56:
         mask = 0xFFFFFFF
     return block >> (block_size // 2), block & mask
 
@@ -160,24 +162,27 @@ def apply_sbox(blocks):
     return result
 
 
-def bit_rotation(block, shift_count, op):
-    return ((block << shift_count) | (op(block, (28 - shift_count)))) % 2 ** 28
+def bit_rotation(block, block_size, shift_count, mode):
+    if mode:
+        return ((block << shift_count) | block >> (block_size - shift_count)) % 2 ** block_size
+    else:
+        return ((block >> shift_count) | block << (block_size - shift_count)) % 2 ** block_size
 
 
 # mode = True -> Enc
-def key_scheduler(key, mode):
-    global round
-    shift = operator.lshift
-    if not mode:
-        shift = operator.rshift
+def key_scheduler(key, mode, round, subkeys):
+    if round == 17:
+        return
 
-    if mode and round == 1:
+    if round == 1:
         key = prem(key, PARITY_DROP)
-    elif not mode and round == 16:
+
+    if not mode and round == 1:
         (left, right) = partition(key, 56)
         key_block = (left << 28) | right
-        round -= 1
-        return prem(key_block, KEY_PREM)
+        subkey_n = prem(key_block, KEY_PREM)
+        subkeys.append(subkey_n)
+        return key_scheduler(key_block, mode, round + 1, subkeys)
 
     (left, right) = partition(key, 56)
 
@@ -185,16 +190,21 @@ def key_scheduler(key, mode):
     if round not in [1, 2, 9, 16]:
         shift_count = 2
 
-    left = bit_rotation(left, shift_count, shift)
-    right = bit_rotation(right, shift_count, shift)
+    left = bit_rotation(left, 28, shift_count, mode)
+    right = bit_rotation(right, 28, shift_count, mode)
     key_block = (left << 28) | right
-    subkey = prem(key_block, KEY_PREM)
+    subkey_n = prem(key_block, KEY_PREM)
+    subkeys.append(subkey_n)
 
-    if mode:
-        round += 1
-    else:
-        round -= 1
-    return subkey
+    return key_scheduler(key_block, mode, round + 1, subkeys)
+
+
+def driver(key, mode):
+    subkeys = []
+    key_scheduler(key, mode, 1, subkeys)
+    return subkeys
+    # for key in subkeys:
+    # print_b(key, 48)
 
 
 post_IP = prem(test, INITIAL_PERM)
@@ -202,7 +212,5 @@ post_IP = prem(test, INITIAL_PERM)
 y = expansion(a) >> 42
 z = apply_sbox([y])
 
-g = 0b100110111001111110111010010110101111110101101001
-subkeytest = key_scheduler(g, True)
-print_b(g, 64)
-print_b(subkeytest, 48)
+g = 0xAABB09182736CCDD
+subkeytest = driver(g, True)
