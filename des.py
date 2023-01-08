@@ -120,6 +120,9 @@ def prem(block, block_size, table):
     result = 0
     count = 1
 
+    if block_size == 32:
+        block_size = 48
+
     for idx in table:
         if get_bit(block, block_size,  idx):
             result = set_bit(result, block_size, count, True)
@@ -130,38 +133,33 @@ def prem(block, block_size, table):
 
 
 def partition(block, block_size):
-    if block_size == 56:
+    if block_size == 64:
+        mask = 0xFFFFFFFF
+    elif block_size == 56:
         mask = 0xFFFFFFF
     else:
         result = []
         mask = 0x3F
-        for i in range(block_size/6):
+        for i in range(block_size//6):
             result.append(block & mask)
             block >>= 6
         return result
 
     return block >> (block_size // 2), block & mask
 
-
-def expansion(block):
-    result = 0
-    count = 1
-    for idx in EXP_PERM:
-        if get_bit(block, idx):
-            result = set_bit(result, count, True)
-        else:
-            result = set_bit(result, count, False)
-        count += 1
-    return result
-
-
 def apply_f(block, block_size, key):
     block = prem(block, block_size, EXP_PERM)
+
     block ^= key
     #partition into eight 6 bits for sbox application
     sbox_input = partition(block, 48)
     sbox_output = apply_sbox(sbox_input)
+    sbox_glued = 0
 
+    for part in sbox_output:
+        sbox_glued |= part
+        sbox_glued <<= 6
+    return prem(sbox_glued, 32, FUNC_PERM)
 
 
 def apply_sbox(blocks):
@@ -170,7 +168,9 @@ def apply_sbox(blocks):
     mask_LSB = 1
     mask_inner = 0b011110
     count = 0
-    for block in blocks:
+
+    while blocks:
+        block = blocks.pop()
         row = ((block & mask_MSB) >> 4 | (block & mask_LSB))
         col = (block & mask_inner) >> 1
         result.append(SBOX[count][row][col])
@@ -211,18 +211,37 @@ def key_scheduler(key, mode, round, subkeys):
 
     return key_scheduler(key_block, mode, round + 1, subkeys)
 
-def des(block, block_size, )
+def des(left, right, keys, round):
+    if round == 17:
+        result = (right << 32) | left
+        return prem(result, 64, FINAL_PERM)
 
-def driver(key):
+    left ^= apply_f(right, 32, keys[round-1])
+    return des(right, left, keys, round + 1)
+
+def driver():
     key = 0xAABB09182736CCDD
     plaintext = 0x123456ABCD132536
-    cipher = 0xC0B7A8D05F3A829C
 
     #ENCRYPTION
     subkeys = []
     key_scheduler(key, True, 1, subkeys)
 
-    plaintext = prem(plaintext, 64, INITIAL_PERM)
+    ip_plain = prem(plaintext, 64, INITIAL_PERM)
+    (left, right) = partition(ip_plain, 64)
+
+    cipher = des(left, right, subkeys, 1)
+
+    #DECRYPTION
+    subkeys = []
+    key_scheduler(key, False, 1, subkeys)
+    ip_cipher = prem(cipher, 64, INITIAL_PERM)
+    (left2, right2) = partition(ip_cipher, 64)
+    print(hex(plaintext))
+    plaintext = des(left2, right2, subkeys, 1)
+    print(hex(plaintext))
+
+driver()
 
 
 
