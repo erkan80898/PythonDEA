@@ -133,8 +133,12 @@ def partition(block, block_size):
     if block_size == 56:
         mask = 0xFFFFFFF
     else:
-        #6 bit mask
+        result = []
         mask = 0x3F
+        for i in range(block_size/6):
+            result.append(block & mask)
+            block >>= 6
+        return result
 
     return block >> (block_size // 2), block & mask
 
@@ -155,6 +159,8 @@ def apply_f(block, block_size, key):
     block = prem(block, block_size, EXP_PERM)
     block ^= key
     #partition into eight 6 bits for sbox application
+    sbox_input = partition(block, 48)
+    sbox_output = apply_sbox(sbox_input)
 
 
 
